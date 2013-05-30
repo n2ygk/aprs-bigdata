@@ -3,6 +3,22 @@
  APRS parsing User Defined Functions (UDF) for Pig.
 """
 __author__="Alan Crosswell <alan@columbia.edu>"
+"""
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+    Copyright (c) 2013 Alan Crosswell
+"""
 import re
 # allow testing of this code outside the Pig context by defining a dummy decorator
 if 'outputSchema' not in locals():
@@ -40,6 +56,16 @@ class Position:
   def __init__(self):
     self.lat = self.lon = self.lat_a = self.lon_a = self.cse = self.spd = 0.0
 
+  def lat2DD(self,lat,NS):
+    """ convert degrees, minutes, NS compass direction to decimal degrees """
+    self.lat = float(lat[0:2]) + float(lat[2:])/60.0
+    if NS == 'S': self.lat = -self.lat
+
+  def lon2DD(self,lon,EW):
+    """ convert degrees, minutes, EW compass direction to decimal degrees """
+    self.lon = float(lon[0:3]) + float(lon[3:])/60.0
+    if EW == 'W': self.lon = -self.lon
+    
   def pos(self,to_call,info):
     """
     Source: APRS101.pdf
@@ -84,10 +110,8 @@ class Position:
       _lat = _lat.replace(' ','0')
       _lon = _lon.replace(' ','0')
     # DDMM.mm -> DD + MM.mm/60
-    self.lat = float(_lat[0:2]) + float(_lat[2:])/60.0
-    if _NS == 'S': self.lat = -self.lat
-    self.lon = float(_lon[0:3]) + float(_lon[3:])/60.0
-    if _EW == 'W': self.lon = -self.lon
+    self.lat2DD(_lat,_NS)
+    self.lon2DD(_lon,_EW)
     # TODO: CSE/SPD
     return self.value()
 
@@ -116,8 +140,29 @@ class Position:
     $GPGLL,2554.459,N,08020.187,W,154027.281,A 
     $GPRMC,063909,A,3349.4302,N,11700.3721,W,43.022,89.3,291099,13.6,E*52 
     $GPVTG,318.7,T,,M,35.1,N,65.0,K*69
+
     """
-    pass
+    g = info.split(',')
+    if g[0] == '$GPGGA':
+      _lat = g[2]
+      _NS = g[3]
+      _lon = g[4]
+      _EW = g[5]
+    elif g[0] == '$GPGLL':
+      _lat = g[1]
+      _NS = g[2]
+      _lon = g[3]
+      _EW = g[4]
+    elif g[0] == '$GPRMC':
+      _lat = g[3]
+      _NS = g[4]
+      _lon = g[5]
+      _EW = g[6]
+    else:
+      return None
+    self.lat2DD(_lat,_NS)
+    self.lon2DD(_lon,_EW)
+    return self.value()
 
   def mic_e(self,to_call,info):
     """
@@ -165,7 +210,7 @@ def position(to_call,info):
   lon_ambiguity:float in degrees (e.g. 1.0)
   course:float in degrees (0...360)
   speed:float in knots (0 = stationary)
-  altitude:float in miles???
+  [altitude:float in miles???]
 
   """
   return Position().parse(to_call,info)
