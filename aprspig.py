@@ -20,12 +20,22 @@ __author__="Alan Crosswell <alan@columbia.edu>"
     Copyright (c) 2013 Alan Crosswell
 """
 import re
-# allow testing of this code outside the Pig context by defining a dummy decorator
+# allow friendly use of this code outside the Pig context by defining a decorator that
+# returns the results as a dict
 if 'outputSchema' not in locals():
   def outputSchema(schema):
+    sch = []                    # make an ordered list of dict keys
+    for s in schema.split(','):
+      name,type = s.split(':')
+      sch.append(name)
     def wrapper(func):
       def impl(*args, **kwargs):
-        return func(*args, **kwargs)
+        keyz = {}
+        r = func(*args, **kwargs)
+        if not r: return None
+        for n in range(len(r)):
+          keyz[sch[n]] = r[n]
+        return keyz
       return impl
     return wrapper
 
@@ -284,5 +294,4 @@ if __name__ == '__main__':
     print l
     r = aprs(l)
     if r:
-      time,from_call,to_call,digis,gtype,gate,info,firsthop = r
-      print position(to_call,info)
+      print position(r['to_call'],r['info'])
