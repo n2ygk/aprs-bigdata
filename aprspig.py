@@ -19,25 +19,8 @@ __author__="Alan Crosswell <alan@columbia.edu>"
 
     Copyright (c) 2013 Alan Crosswell
 """
-import re
-# allow friendly use of this code outside the Pig context by defining a decorator that
-# returns the results as a dict
 if 'outputSchema' not in locals():
-  def outputSchema(schema):
-    sch = []                    # make an ordered list of dict keys
-    for s in schema.split(','):
-      name,type = s.split(':')
-      sch.append(name)
-    def wrapper(func):
-      def impl(*args, **kwargs):
-        keyz = {}
-        r = func(*args, **kwargs)
-        if not r: return None
-        for n in range(len(r)):
-          keyz[sch[n]] = r[n]
-        return keyz
-      return impl
-    return wrapper
+  from pigDecorators import *
 
 @outputSchema("time:chararray,from_call:chararray,to_call:chararray,digis:chararray,gtype:chararray,gate:chararray,info:chararray,firsthop:chararray")
 def aprs(l):
@@ -49,19 +32,35 @@ def aprs(l):
   output: Parsed components of line or null if it fails to parse. 
           Beyond just parsing, the first hop digipeater is given.
   """
-  s = re.match('^(?P<time>^[^ ]*) (?P<from_call>[^>]+)>(?P<to_call>[^,]+),*(?P<digis>.*),(?P<gtype>[^,]+),(?P<gate>[^:]+)(:)(?P<info>.*)$',l)
-  if s:
-    digis = s.group('digis')
-    d1 = digis.split(',')[0]
-    if '*' in digis:            # if there's a repeated flag set in digis, then the first hop is here.
-      firsthop=d1.rstrip('*')
-    else:                       # if not, then the first hop is the may be a hidden flood call or IGATE
-      r = re.match('^\D+(?P<N>\d?)-?(?P<n>\d?)$',d1)
-      if r and r.group('N')!=r.group('n'): # a floodN-n digi that has been used (decremented)
-        firsthop = d1
-      else:
-        firsthop=s.group('gate')
-    return s.group('time'),s.group('from_call'),s.group('to_call'),s.group('digis'),s.group('gtype'),s.group('gate'),s.group('info'),firsthop
+  n = l.find(' ')
+  if n < 0: return None
+  time = l[0:n]
+  l = l[n+1:]
+  n = l.find('>')
+  if n < 0: return None  
+  from_call = l[0:n]
+  l = l[n+1:]
+  n = l.find(':')
+  if n < 0: return None  
+  digis = l[0:n].split(',')
+  info = l[n+1:]
+  to_call = digis[0]
+  digis = digis[1:]
+  if not digis: return None     # there will always be a "qAR,gateway" since this is APRS-IS
+  gtype = digis[-2]
+  gate = digis[-1]
+  d1 = digis[0]
+  digis = digis[0:-2]
+  if '*' in digis:            # if there's a repeated flag set in digis, then the first hop is here.
+    firsthop=d1.rstrip('*')
+  else:                       # if not, then the first hop may be a hidden flood call or IGATE
+    n = d1[-1] if d1[-1].isdigit() else None
+    N = d1[-3] if len(d1)>3 and d1[-2] == '-' and d1[-3].isdigit() else None
+    if (N or n) and N != n:
+      firsthop = d1
+    else:
+      firsthop=gate
+  return time,from_call,to_call,digis,gtype,gate,info,firsthop
 
 class Position:
   """
@@ -83,13 +82,15 @@ class Position:
 
   def lat2DD(self,lat,NS):
     """ convert degrees, minutes, NS compass direction to decimal degrees """
-    self.lat = float(lat[0:2]) + float(lat[2:])/60.0
-    if NS == 'S': self.lat = -self.lat
+    if lat[0:4].isdigit() and lat[4] == '.' and lat[5:].isdigit():
+      self.lat = float(lat[0:2]) + float(lat[2:])/60.0
+      if NS == 'S': self.lat = -self.lat
 
   def lon2DD(self,lon,EW):
     """ convert degrees, minutes, EW compass direction to decimal degrees """
-    self.lon = float(lon[0:3]) + float(lon[3:])/60.0
-    if EW == 'W': self.lon = -self.lon
+    if lon[0:5].isdigit() and lon[5] == '.' and lon[6:].isdigit():
+      self.lon = float(lon[0:3]) + float(lon[3:])/60.0
+      if EW == 'W': self.lon = -self.lon
   
   def pos(self,to_call,info):
     """
@@ -110,15 +111,15 @@ class Position:
     !4903.50N/07201.75W-comment text /A=001234
     =4903.50N/07201.75W-comment text /A=001234
     """
-    if re.match('\D',info[1]):  # if first char of lat is not a digit this is a compressed position report
+    if not info[1].isdigit(): # if first char of lat is not a digit this is a compressed position report
       return self.pos_cmp(to_call,info)
+    if len(info) < 19: return None
     if info[9]=='\\' and info[19]=='.': return None
-    # "The level of ambiguity specified in the latitude will automatically apply to the longitude as well...."
     _lat = info[1:8]
     _NS = info[8]
     _lon = info[10:18]
     _EW = info[18]
-    _csespd = info[20:]
+    _csespd = info[20:] if len(info) > 27 else None
     self.lat_a = self.lon_a = self.ambiguity[_lat.count(' ')]
     if self.lat_a > 0.0:
       _lat = _lat.replace(' ','0')
@@ -127,10 +128,12 @@ class Position:
     self.lat2DD(_lat,_NS)
     self.lon2DD(_lon,_EW)
     # CSE/SPD
-    r = re.match('^(?P<cse>\d\d\d)/(?P<spd>\d\d\d)',_csespd)
-    if r:
-      self.cse = float(r.group('cse'))
-      self.spd = float(r.group('spd'))
+    if _csespd and len(_csespd) >= 7 and _csespd[3]=='/':
+      _cse = _csespd[0:3]
+      _spd = _csespd[4:7]
+      if _cse.isdigit() and _spd.isdigit():
+        self.cse = float(_cse)
+        self.spd = float(_spd)
     return self.value()
 
   def pos_cmp(self,to_call,info):
@@ -140,6 +143,7 @@ class Position:
     !/YYYYXXXX$csT - Ugh, just read pages 37-41
     01234567890123
     """
+    if len(info) < 12: return None
     _lat = info[2:6]
     _lon = info[6:10]
     _c = info[10]
@@ -204,6 +208,7 @@ class Position:
     See Section 10:
     Mic-E pages 42-56
     """
+    if len(i) < 6: return None
     beta = i[0] in '\0x1c\0x1d'
     # check for position ambiguity (not sure this is correct)
     self.lat_a = self.lon_a = self.ambiguity[t[0:6].count('Z')]
