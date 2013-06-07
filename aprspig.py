@@ -111,6 +111,7 @@ class Position:
     !4903.50N/07201.75W-comment text /A=001234
     =4903.50N/07201.75W-comment text /A=001234
     """
+    if len(info) < 3: return None
     if not info[1].isdigit(): # if first char of lat is not a digit this is a compressed position report
       return self.pos_cmp(to_call,info)
     if len(info) < 19: return None
@@ -181,16 +182,19 @@ class Position:
     """
     g = info.split(',')
     if g[0] == '$GPGGA':
+      if len(g) < 6: return None
       _lat = g[2]
       _NS = g[3]
       _lon = g[4]
       _EW = g[5]
     elif g[0] == '$GPGLL':
+      if len(g) < 5: return None
       _lat = g[1]
       _NS = g[2]
       _lon = g[3]
       _EW = g[4]
     elif g[0] == '$GPRMC':
+      if len(g) < 7: return None
       _lat = g[3]
       _NS = g[4]
       _lon = g[5]
