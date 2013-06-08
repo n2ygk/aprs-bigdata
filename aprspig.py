@@ -68,7 +68,7 @@ class Position:
   Methods to parse the various APRS position report formats.
   """
   def __init__(self):
-    self.lat = self.lon = self.lat_a = self.lon_a = self.cse = self.spd = 0.0
+    self.lat = self.lon = self.amb = self.cse = self.spd = 0.0
     self.ambiguity = {0: 0.0,        # no ambiguity
                       1: 0.1/60.0,   # 4903.5 N represents latitude to nearest 1/10th of a minute. 
                       2: 1.0/60.0,   # 4903.  N represents latitude to nearest minute.
@@ -121,8 +121,8 @@ class Position:
     _lon = info[10:18]
     _EW = info[18]
     _csespd = info[20:] if len(info) > 27 else None
-    self.lat_a = self.lon_a = self.ambiguity[_lat.count(' ')]
-    if self.lat_a > 0.0:
+    self.amb = self.ambiguity[_lat.count(' ')]
+    if self.amb > 0.0:
       _lat = _lat.replace(' ','0')
       _lon = _lon.replace(' ','0')
     # DDMM.mm -> DD + MM.mm/60
@@ -149,7 +149,6 @@ class Position:
     _lon = info[6:10]
     _c = info[10]
     _s = info[11]
-    _type = info[12]
 
     self.lat = 90.0 - float((ord(_lat[0])-33) * 91**3 + (ord(_lat[1])-33) * 91**2 + (ord(_lat[2])-33) * 91 + ord(_lat[3])-33)/380926.0
     self.lon = -180.0 + float((ord(_lon[0])-33) * 91**3 + (ord(_lon[1])-33) * 91**2 + (ord(_lon[2])-33) * 91 + ord(_lon[3])-33)/190463.0
@@ -212,10 +211,10 @@ class Position:
     See Section 10:
     Mic-E pages 42-56
     """
-    if len(i) < 6: return None
+    if len(i) < 6 or len(t) < 6: return None
     beta = i[0] in '\0x1c\0x1d'
     # check for position ambiguity (not sure this is correct)
-    self.lat_a = self.lon_a = self.ambiguity[t[0:6].count('Z')]
+    self.amb = self.ambiguity[t[0:6].count('Z')]
     # latitude HHMM.SS are encoded as right nibbles of to_call.
     latDD = (ord(t[0])&0x0f)*10 + (ord(t[1])&0x0f)
     latMM = ((ord(t[3])&0x0f)*10.0+ (ord(t[3])&0x0f))/60.0
@@ -274,11 +273,11 @@ class Position:
   def value(self):
     """
     Return Position to match the expected Pig outputSchema:
-    latitude:float,longitude:float,lat_ambiguity:float,lon_ambiguity:float,course:float,speed:float
+    latitude:double,longitude:double,ambiguity:double,course:double,speed:double
     """
-    return self.lat,self.lon,self.lat_a,self.lon_a,self.cse,self.spd
+    return self.lat,self.lon,self.amb,self.cse,self.spd
 
-@outputSchema("latitude:float,longitude:float,lat_ambiguity:float,lon_ambiguity:float,course:float,speed:float")
+@outputSchema("latitude:double,longitude:double,ambiguity:double,course:double,speed:double")
 def position(to_call,info):
   """
   Given an APRS to_call and information field, return canonical position or Null if none.
@@ -287,14 +286,16 @@ def position(to_call,info):
   Parses the known APRS position report formats and returns:
   latitude:float in degrees (e.g. 49.1234)
   longitude:float in degrees (e.g. -72.4321)
-  lat_ambiguity:float in degrees (e.g. 1.0)
-  lon_ambiguity:float in degrees (e.g. 1.0)
+  ambiguity:float in degrees (e.g. 1.0)
   course:float in degrees (0...360)
   speed:float in knots (0 = stationary)
   [altitude:float in miles???]
 
   """
-  return Position().parse(to_call,info)
+  try:
+    return Position().parse(to_call,info)
+  except:
+    return None
 
 if __name__ == '__main__':
   import sys
