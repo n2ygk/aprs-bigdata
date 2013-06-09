@@ -22,8 +22,7 @@ __author__="Alan Crosswell <alan@columbia.edu>"
 if 'outputSchema' not in locals():
   from pigDecorators import *
 
-@outputSchema("time:chararray,from_call:chararray,to_call:chararray,digis:chararray,gtype:chararray,gate:chararray,info:chararray,firsthop:chararray")
-def aprs(l):
+def parse_aprs(l):
   """
   Parse APRS packet into attributes useable by Pig.
   Given an input string collected from APRS-IS (preceded by a timestamp), 
@@ -61,6 +60,13 @@ def aprs(l):
     else:
       firsthop=gate
   return time,from_call,to_call,digis,gtype,gate,info,firsthop
+
+@outputSchema("time:chararray,from_call:chararray,to_call:chararray,digis:chararray,gtype:chararray,gate:chararray,info:chararray,firsthop:chararray")
+def aprs(l):
+  try:
+    return parse_aprs(l)
+  except:
+    return None
 
 class Position:
   """
