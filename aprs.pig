@@ -54,7 +54,7 @@ DESCRIBE firsthops;
 
 -- eliminate the duplicative firsthop key that is both the group field and firsthop field in each tuple in the bag.
 firsts = FOREACH firsthops {
-	pos = FOREACH projectpos GENERATE from_call,latitude,longitude;
+	pos = FOREACH distinctpos GENERATE from_call,latitude,longitude;
 	GENERATE group as firsthop, pos;
 	};
 describe firsts;
