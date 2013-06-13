@@ -1,6 +1,6 @@
 #/usr/bin/python
 """
- APRS parsing User Defined Functions (UDF) for Pig.
+ APRS parsing User Defined Functions (UDF) for Pig (or not).
 """
 __author__="Alan Crosswell <alan@columbia.edu>"
 """
@@ -20,7 +20,27 @@ __author__="Alan Crosswell <alan@columbia.edu>"
     Copyright (c) 2013 Alan Crosswell
 """
 if 'outputSchema' not in locals():
-  from pigDecorators import *
+  def outputSchema(schema):
+    """
+    allow friendly use of your code outside the Pig context by defining a decorator that
+    returns the results as a dict. Or just write your own decorator and make sure it is
+    defined before you import this module.
+    """
+    sch = []
+    for s in schema.split(','):
+      name,type = s.split(':')
+      sch.append(name)
+    def wrapper(func):
+      def impl(*args, **kwargs):
+        keyz = {}
+        r = func(*args, **kwargs)
+        if not r: return None
+        for n in range(len(r)):
+          keyz[sch[n]] = r[n]
+        return keyz
+      return impl
+    return wrapper
+
 
 def parse_aprs(l):
   """
@@ -304,10 +324,15 @@ def position(to_call,info):
     return None
 
 if __name__ == '__main__':
+  """
+  This code can operate as a Hadoop streaming mapper.
+  Input: rows from aprs-is logs.
+  Output: firsthop\tfrom_call,latitude,longitude
+  """
   import sys
-  f = open(sys.argv[1])
-  for l in f:
-    print l
+  for l in sys.stdin:
     r = aprs(l)
-    if r:
-      print position(r['to_call'],r['info'])
+    if r and r['firsthop'] and 'WIDE' not in r['firsthop']:
+      p = position(r['to_call'],r['info'])
+      if p:
+        print "{}\t{},{},{}".format(r['firsthop'],r['from_call'],p['latitude'],p['longitude'])
