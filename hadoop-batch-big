@@ -1,0 +1,20 @@
+#!/bin/sh
+cd ~alan/datasci/AWS/elastic-mapreduce-cli
+NAME="Hadoop `date  +'%Y-%m-%d-%H:%M:%S'`"
+NUM=${1:-20}
+MAPPER=${2:-"s3://aprs-is/code/aprspig.py"}
+REDUCER=${3:-"s3://aprs-is/code/aprsreducer.py"}
+INPUT=${4:-"s3n://aprs-is/aprsis-*"}
+OUTPUT=${5:-"s3n://aprs-is/reduced/digipeaters.json"}
+echo launching $NAME running $MAPPER and $REDUCER with $NUM instances in 5 seconds...
+set -x
+sleep 5
+./elastic-mapreduce --create --stream \
+--name "$NAME" \
+--num-instances $NUM --instance-type m1.small \
+--bootstrap-action s3n://us-west-2.elasticmapreduce/bootstrap-actions/configurations/latest/memory-intensive \
+--bootstrap-name "memory intensive" \
+--input $INPUT \
+--mapper $MAPPER \
+--reducer $REDUCER \
+--output $OUTPUT
