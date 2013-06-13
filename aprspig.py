@@ -1,4 +1,4 @@
-#/usr/bin/python
+#!/usr/bin/python
 """
  APRS parsing User Defined Functions (UDF) for Pig (or not).
 """
