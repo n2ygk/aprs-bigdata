@@ -27,13 +27,16 @@ if __name__ == '__main__':
 
   curhop = None
   posits = None
+  incounts = outcounts = 0
   for l in sys.stdin:
+    incounts += 1
     splits = l.split('\t')
     firsthop = splits[0]
     if firsthop != curhop:
       if posits:
         json.dump({"f":curhop,"p":list(posits)},sys.stdout)
         print
+        outcounts += 1
       curhop = firsthop
       posits=set()
     call,lat,lon = splits[1].rstrip().split(',')
@@ -41,5 +44,5 @@ if __name__ == '__main__':
   if posits: 
     json.dump({"f":curhop,"p":list(posits)},sys.stdout)
     print
-   
-    
+    outcounts += 1
+  sys.stderr.write("aprsreduce: %d input %d output\n"%(incounts,outcounts))
