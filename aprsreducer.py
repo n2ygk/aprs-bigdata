@@ -4,7 +4,7 @@ import json
 """
 Haddop reducer for aprs-is logs reduced by aprspig.py.
 Input: firsthop\tfrom_call,latitude,longitude
-Output: {"firsthop": "firsthop", "pos": [{"from": "from","lat": lat, "lon":, lon}]}
+Output: {"f": firsthop, "p": [[from,lat,lon]...]}
 """
 __author__="Alan Crosswell <alan@columbia.edu>"
 """
