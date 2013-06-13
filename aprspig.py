@@ -330,9 +330,15 @@ if __name__ == '__main__':
   Output: firsthop\tfrom_call,latitude,longitude
   """
   import sys
+  incounts = outcounts = 0
   for l in sys.stdin:
     r = aprs(l)
+    incounts += 1
     if r and r['firsthop'] and 'WIDE' not in r['firsthop']:
       p = position(r['to_call'],r['info'])
       if p:
-        print "{}\t{},{},{}".format(r['firsthop'],r['from_call'],p['latitude'],p['longitude'])
+        #print "{}\t{},{},{}".format(r['firsthop'],r['from_call'],p['latitude'],p['longitude'])
+        print "%s\t%s,%s,%s"%(r['firsthop'],r['from_call'],p['latitude'],p['longitude'])
+        outcounts += 1
+  sys.stderr.write("aprsmap: %d input %d output\n"%(incounts,outcounts))
+
