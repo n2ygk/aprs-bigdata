@@ -11,41 +11,46 @@ cd ~alan/datasci/AWS/elastic-mapreduce-cli
 NAME="Hadoop `date  +'%Y-%m-%d-%H:%M:%S'`"
 NUM=${1:-10}
 
+# original mapper if proceessing the raw input logs:
+#MAPPER=${2:-"s3://aprs-is/code/aprspig.py"}
+#INPUT=${4:-"s3n://aprs-is/aprsis-*"}
+
+# meow
+#MAPPER=/bin/cat
+
 # since I ran this once as a map-only job, the output has already been parsed and is
 # in s3n://aprs-is/reduced/digipeaters.txt/ as key = <firsthop> value=<from_call,lat,lon>
 # in 20-20 hindsight I should have made the key as I am now.
-#MAPPER=${2:-"s3://aprs-is/code/aprspig.py"}
-#MAPPER=/bin/cat
 MAPPER=${2:-"s3://aprs-is/code/aprsmapper_fullkey.py"}
-#INPUT=${4:-"s3n://aprs-is/aprsis-*"}
 INPUT=${4:-"s3n://aprs-is/reduced/digipeaters.txt/part-*"}
-# 
+
 # my first-pass reducer would blow up due to trying to build up a set()
 #REDUCER=${3:-"s3://aprs-is/code/aprsreducer.py"}
+
 # this one is for a map-only job
 #REDUCER=NONE
+
 # this one spits out position reports without deduping.
 # see s3n://aprs-is/reduced/digipeaters.json/
 #REDUCER=${3:-"s3://aprs-is/code/aprsreducer_nodedupe.py"}
 #OUTPUT=${5:-"s3n://aprs-is/reduced/digipeaters.json"}
+
 # my new deduper that expects key=<firsthop,from_call,latitude,longitude>, data=nothing
 REDUCER=${3:-"s3://aprs-is/code/aprsreducer_dedupe.py"}
 OUTPUT=${5:-"s3n://aprs-is/reduced/firsthops.json"}
 
+# had to use a --json and --param's since the emr-cli script can't properly pass some hadoop args.
 echo launching $NAME running $MAPPER and $REDUCER with $NUM instances in 5 seconds...
 set -x
 sleep 5
-./elastic-mapreduce --create --stream \
+./elastic-mapreduce --create \
 --name "$NAME" \
 --num-instances $NUM --instance-type m1.medium \
 --bootstrap-action s3n://us-west-2.elasticmapreduce/bootstrap-actions/configure-hadoop \
 --args -m,mapred.task.timeout=2400000,-m,mapred.map.child.java.opts=-Xmx1024m,-m,mapred.map.child.java.opts=-Xmx1024m,-m,mapred.max.tracker.failures=10,-m,mapred.reduce.max.attempts=10 \
---input $INPUT \
---mapper $MAPPER \
---reducer $REDUCER \
---output $OUTPUT \
---partitioner=org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner \
---jobconf stream.map.output.field.separator=, \
---jobconf stream.num.map.output.key.fields=4 \
---jobconf mapred.text.key.partitioner.options=-k1 \
+--json ../streamer.json \
+--param "<input>=$INPUT" \
+--param "<mapper>=$MAPPER" \
+--param "<reducer>=$REDUCER" \
+--param "<output>=$OUTPUT" \
 --trace

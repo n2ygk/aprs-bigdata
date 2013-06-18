@@ -1,11 +1,6 @@
 #!/usr/bin/python
 import sys
 import json
-"""
-Haddop reducer for aprs-is logs reduced by aprspig.py.
-Input: firsthop\tfrom_call,latitude,longitude
-Output: {"f": firsthop, "p": [[from,lat,lon]...]}
-"""
 __author__="Alan Crosswell <alan@columbia.edu>"
 """
     This program is free software: you can redistribute it and/or modify
@@ -23,35 +18,32 @@ __author__="Alan Crosswell <alan@columbia.edu>"
 
     Copyright (c) 2013 Alan Crosswell
 """
+
 def main():
-  curhop = None
-  posits = None
+  """ 
+  Haddop mapper for aprs-is logs reduced by aprspig.py.
+  Input: firsthop\tfrom_call,latitude,longitude (s3://aprs-is/reducer/digipeaters.txt/)
+  output: firsthop,from_call,latitude,longitude\t(nothing) 
+  so that the reducer can eliminate duplicate positions.
+  """ 
   incounts = outcounts = 0
   for l in sys.stdin:
+    if incounts%1000 == 0:
+      sys.stderr.write("aprsMapFullKey: %d input %d output...\n"%(incounts,outcounts))
     incounts += 1
-    if incounts%100 == 0:
-      sys.stderr.write("aprsReduce: %d input %d output...\n"%(incounts,outcounts))
     splits = l.split('\t')
-    firsthop = splits[0]
-    if firsthop != curhop:
-      if posits:
-        json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-        print
-        outcounts += 1
-      curhop = firsthop
-      posits=set()
-    call,lat,lon = splits[1].rstrip().split(',')
-    posits.add((call,float(lat),float(lon)))
-  if posits: 
-    json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-    print
-    outcounts += 1
-  sys.stderr.write("aprsReduce: %d input %d output.\n"%(incounts,outcounts))
+    s = splits[1].rstrip().split(',')
+    if len(s) != 3:
+      sys.stderr.write("aprsMapFullKey: value tuple not length 3 (%d): %s.\n"%(len(s),s))
+    else:
+      call,lat,lon = s
+      print "%s,%s,%f,%f\t"%(splits[0],call,float(lat),float(lon))
+      outcounts += 1
+  sys.stderr.write("aprsMapFullKey: %d input %d output.\n"%(incounts,outcounts))
 
 if __name__ == '__main__':
 
   try:
     main()
   except:
-    sys.stderr.write("aprsReduce: Exception %s\n"%(sys.exc_info()[0]))
-
+    sys.stderr.write("aprsMapFullKey: Exception %s\n"%(sys.exc_info()[0]))

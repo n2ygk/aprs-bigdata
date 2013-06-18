@@ -3,8 +3,10 @@ import sys
 import json
 """
 Haddop reducer for aprs-is logs reduced by aprspig.py.
-Input: firsthop\tfrom_call,latitude,longitude
+Input: firsthop,from_call,latitude,longitude\t(nothing)
 Output: {"f": firsthop, "p": [[from,lat,lon]...]}
+Assumes hadoop partitioner was used to partition all keys for the same firsthop 
+to the same reducer.
 """
 __author__="Alan Crosswell <alan@columbia.edu>"
 """
@@ -23,35 +25,41 @@ __author__="Alan Crosswell <alan@columbia.edu>"
 
     Copyright (c) 2013 Alan Crosswell
 """
+
 def main():
-  curhop = None
-  posits = None
   incounts = outcounts = 0
+  curhop = None
   for l in sys.stdin:
+    if incounts%1000 == 0:
+      sys.stderr.write("aprsReduceDedupe: %d input %d output...\n"%(incounts,outcounts))
     incounts += 1
-    if incounts%100 == 0:
-      sys.stderr.write("aprsReduce: %d input %d output...\n"%(incounts,outcounts))
     splits = l.split('\t')
-    firsthop = splits[0]
-    if firsthop != curhop:
-      if posits:
-        json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-        print
+    s = splits[0].rstrip().split(',')
+    if len(s) != 4:
+      sys.stderr.write("aprsReduceDedupe: key tuple not length 4 (%d): %s.\n"%(len(s),s))
+    else:
+      firsthop,call,lat,lon = s
+      if firsthop != curhop:
+        if curhop != None:
+          print ']}'
+        curhop = firsthop
+        lastpos = None
+        first = True
+        print '{"f":"%s","p":['%(firsthop),
+      if lastpos != (call,float(lat),float(lon)):
+        if not first: 
+          print ",",
+        print '["%s",%f,%f]'%(call,float(lat),float(lon)),
         outcounts += 1
-      curhop = firsthop
-      posits=set()
-    call,lat,lon = splits[1].rstrip().split(',')
-    posits.add((call,float(lat),float(lon)))
-  if posits: 
-    json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-    print
-    outcounts += 1
-  sys.stderr.write("aprsReduce: %d input %d output.\n"%(incounts,outcounts))
+      lastpos = (call,float(lat),float(lon))
+      first = False
+  if curhop != None:
+    print ']}'
+  sys.stderr.write("aprsReduceDedupe: %d input %d output.\n"%(incounts,outcounts))
 
 if __name__ == '__main__':
 
   try:
     main()
   except:
-    sys.stderr.write("aprsReduce: Exception %s\n"%(sys.exc_info()[0]))
-
+    sys.stderr.write("aprsReduceDedupe: Exception %s\n"%(sys.exc_info()[0]))

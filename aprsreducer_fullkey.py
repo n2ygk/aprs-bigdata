@@ -23,35 +23,32 @@ __author__="Alan Crosswell <alan@columbia.edu>"
 
     Copyright (c) 2013 Alan Crosswell
 """
+
 def main():
-  curhop = None
-  posits = None
+  """ 
+  input: <firsthop>\t<position>  (s3://aprs-is/reduced/digipeaters.txt)
+  output: <firsthop position>\t  (s3://aprs-is/reduced/digidupes.txt)
+  so that a next-phase reducer can eliminate duplicate positions.
+  """ 
   incounts = outcounts = 0
   for l in sys.stdin:
+    if incounts%1000 == 0:
+      sys.stderr.write("aprsReduceNoDedupe: %d input %d output...\n"%(incounts,outcounts))
     incounts += 1
-    if incounts%100 == 0:
-      sys.stderr.write("aprsReduce: %d input %d output...\n"%(incounts,outcounts))
     splits = l.split('\t')
-    firsthop = splits[0]
-    if firsthop != curhop:
-      if posits:
-        json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-        print
-        outcounts += 1
-      curhop = firsthop
-      posits=set()
-    call,lat,lon = splits[1].rstrip().split(',')
-    posits.add((call,float(lat),float(lon)))
-  if posits: 
-    json.dump({"f":curhop,"p":list(posits)},sys.stdout)
-    print
-    outcounts += 1
-  sys.stderr.write("aprsReduce: %d input %d output.\n"%(incounts,outcounts))
+    s = splits[1].rstrip().split(',')
+    if len(s) != 3:
+      sys.stderr.write("aprsReduceNoDedupe: value tuple not length 3 (%d): %s.\n"%(len(s),s))
+    else:
+      call,lat,lon = s
+      json.dump({"f":splits[0],"p":(call,lat,lon)},sys.stdout)
+      print
+      outcounts += 1
+  sys.stderr.write("aprsReduceNoDedupe: %d input %d output.\n"%(incounts,outcounts))
 
 if __name__ == '__main__':
 
   try:
     main()
   except:
-    sys.stderr.write("aprsReduce: Exception %s\n"%(sys.exc_info()[0]))
-
+    sys.stderr.write("aprsReduceNoDedupe: Exception %s\n"%(sys.exc_info()[0]))
