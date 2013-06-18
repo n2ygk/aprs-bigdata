@@ -1,0 +1,23 @@
+[
+ {
+     "Name": "Streaming with KeyFieldBasedPartitioner",
+     "ActionOnFailure": "TERMINATE_JOB_FLOW",
+     "HadoopJarStep": {
+         "Jar": "\/home\/hadoop\/contrib\/streaming\/hadoop-streaming.jar",
+         "Args": [
+             "-Dstream.map.output.field.separator=,",
+             "-Dstream.num.map.output.key.fields=4",
+             "-Dmapred.text.key.partitioner.options=-k1",
+             "-partitioner","org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner",
+             "-input",
+             "<input>",
+             "-output",
+             "<output>",
+             "-mapper",
+             "<mapper>",
+             "-reducer",
+             "<reducer>"
+         ],
+     }
+ }
+]

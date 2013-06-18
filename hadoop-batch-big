@@ -37,7 +37,8 @@ INPUT=${4:-"s3n://aprs-is/reduced/digipeaters.txt/part-*"}
 
 # my new deduper that expects key=<firsthop,from_call,latitude,longitude>, data=nothing
 REDUCER=${3:-"s3://aprs-is/code/aprsreducer_dedupe.py"}
-OUTPUT=${5:-"s3n://aprs-is/reduced/firsthops.json"}
+#OUTPUT=${5:-"s3n://aprs-is/reduced/firsthops.json"}
+OUTPUT=${5:-"s3n://aprs-is/reduced/firsthops-deduped.json"}
 
 # had to use a --json and --param's since the emr-cli script can't properly pass some hadoop args.
 echo launching $NAME running $MAPPER and $REDUCER with $NUM instances in 5 seconds...
